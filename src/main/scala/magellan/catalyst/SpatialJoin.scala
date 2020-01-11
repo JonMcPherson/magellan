@@ -117,16 +117,22 @@ private[magellan] case class SpatialJoin(session: SparkSession)
     val nullable = true
     val metadata = Metadata.empty
     val exprId = NamedExpression.newExprId
-    val qualifier = Seq.empty[String]
-    val isGenerated = false.asInstanceOf[AnyRef]
-    if (ctor.getParameterCount == 7) {
+    val qualifier = None
+    val isGenerated = false
+
+    val paramCount = ctor.getParameterCount
+    if (paramCount == 7) {
       // prior to Spark 2.3
-      ctor.newInstance(name, dt, nullable.asInstanceOf[AnyRef], metadata, exprId, qualifier, isGenerated)
+      ctor.newInstance(name, dt, nullable.asInstanceOf[AnyRef], metadata, exprId, qualifier, isGenerated.asInstanceOf[AnyRef])
+        .asInstanceOf[Attribute]
+    } else if (paramCount == 6 && ctor.getParameterTypes.last == classOf[Option[_]]) {
+      // Spark 2.3
+      ctor.newInstance(name, dt, nullable.asInstanceOf[AnyRef], metadata, exprId, qualifier)
         .asInstanceOf[Attribute]
     } else {
-      // Spark 2.3  +
-      AttributeReference(name, dt, nullable, metadata)(exprId, qualifier).asInstanceOf[Attribute]
-
+      // Spark 2.4 +  (compiled with 2.4)
+      AttributeReference(name, dt, nullable, metadata)(exprId, Seq.empty[String])
+        .asInstanceOf[Attribute]
     }
 
   }
